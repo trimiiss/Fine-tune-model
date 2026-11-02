@@ -1,0 +1,10 @@
+frontend/node_modules/
+frontend/dist/
+backend/__pycache__/
+backend/app/**/__pycache__/
+backend/.venv/
+backend/studio.json
+backend/artifacts/*
+backend/data/*
+!backend/data/sample-support.jsonl
+*.pyc

@@ -1,0 +1,10 @@
+{"instruction":"How do I reset my password?","response":"Open Settings, choose Security, and select Reset password. Follow the verification link sent to your email."}
+{"instruction":"What is fine-tuning?","response":"Fine-tuning is the process of adapting a pretrained AI model with examples from a specific task or style."}
+{"instruction":"How long does training take?","response":"Training time depends on the model, dataset size, and hardware. A tiny model can finish in minutes, while larger models may take much longer."}
+{"instruction":"Where is my uploaded data stored?","response":"Uploaded datasets are stored locally in the backend/data folder of this project."}
+{"instruction":"Can I use a CSV file?","response":"Yes. CSV files must contain instruction and response columns, with one training example per row."}
+{"instruction":"What is LoRA?","response":"LoRA is a parameter-efficient fine-tuning method that trains a small adapter instead of changing every parameter in the base model."}
+{"instruction":"How should I write a good instruction?","response":"Write a clear, specific request that describes what you want the model to do. Avoid vague instructions and unnecessary details."}
+{"instruction":"How can I test my fine-tuned model?","response":"Open the Playground, select the fine-tuned model after training completes, enter a prompt, and click Generate."}
+{"instruction":"What happens if my dataset is invalid?","response":"The studio rejects the upload and explains the problem, such as a missing instruction field or an empty response."}
+{"instruction":"Can I run this project without a GPU?","response":"Yes. CPU training and inference are supported, but they are slower than using a CUDA-enabled GPU."}
