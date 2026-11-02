@@ -3,23 +3,36 @@ from __future__ import annotations
 import inspect
 import json
 import time
+from numbers import Real
 from typing import Callable
 
 from app.services.storage import ARTIFACT_DIR, resolve_model_source
 from app.utils.dataset import to_training_text
 
 
-def train_with_lora(*, model_id: str, rows: list[dict[str, str]], config: dict, experiment_id: str, on_progress: Callable[[int, dict], None]) -> dict:
+class TrainingCancelled(RuntimeError):
+    """Raised when the user cancels a run through the API."""
+
+
+def train_with_lora(*, model_id: str, rows: list[dict[str, str]], config: dict, experiment_id: str, on_progress: Callable[[int, dict], None], should_stop: Callable[[], bool] | None = None) -> dict:
     """Train either a local instruction model (FLAN-T5) or a causal LM adapter with PEFT LoRA."""
     try:
         import torch
         from datasets import Dataset
         from peft import LoraConfig, TaskType, get_peft_model
-        from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer, DataCollatorForLanguageModeling, DataCollatorForSeq2Seq, Trainer, TrainingArguments
+        from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer, DataCollatorForLanguageModeling, DataCollatorForSeq2Seq, Trainer, TrainerCallback, TrainingArguments
     except ImportError as exc:
         raise RuntimeError("Training dependencies are not installed. Run: pip install -r backend/requirements.txt") from exc
 
+    class CancellationCallback(TrainerCallback):
+        def on_step_end(self, args, state, control, **kwargs):
+            if should_stop():
+                raise TrainingCancelled("Training cancelled by user")
+
     start = time.perf_counter()
+    should_stop = should_stop or (lambda: False)
+    if should_stop():
+        raise TrainingCancelled("Training cancelled by user")
     output_dir = ARTIFACT_DIR / experiment_id
     output_dir.mkdir(parents=True, exist_ok=True)
     model_source, local_only = resolve_model_source(model_id)
@@ -57,17 +70,21 @@ def train_with_lora(*, model_id: str, rows: list[dict[str, str]], config: dict, 
     eval_size = max(1, min(len(tokenized) // 5, 32)) if len(tokenized) > 4 else 0
     train_dataset = tokenized.select(range(len(tokenized) - eval_size)) if eval_size else tokenized
     eval_dataset = tokenized.select(range(len(tokenized) - eval_size, len(tokenized))) if eval_size else None
-    training_kwargs = {"output_dir": str(output_dir), "num_train_epochs": float(config["epochs"]), "per_device_train_batch_size": int(config["batch_size"]), "learning_rate": float(config["learning_rate"]), "logging_steps": 1, "save_strategy": "epoch", "report_to": [], "fp16": bool(torch.cuda.is_available()), "remove_unused_columns": False}
+    training_kwargs = {"output_dir": str(output_dir), "num_train_epochs": float(config["epochs"]), "per_device_train_batch_size": int(config["batch_size"]), "learning_rate": float(config["learning_rate"]), "logging_steps": 1, "save_strategy": "epoch", "report_to": [], "fp16": bool(torch.cuda.is_available()), "remove_unused_columns": False, "seed": int(config.get("seed", 42))}
     strategy_key = "eval_strategy" if "eval_strategy" in inspect.signature(TrainingArguments).parameters else "evaluation_strategy"
     training_kwargs[strategy_key] = "epoch" if eval_dataset else "no"
     args = TrainingArguments(**training_kwargs)
     trainer_kwargs = {"model": model, "args": args, "train_dataset": train_dataset, "eval_dataset": eval_dataset, "data_collator": collator}
     trainer_key = "processing_class" if "processing_class" in inspect.signature(Trainer).parameters else "tokenizer"
     trainer_kwargs[trainer_key] = tokenizer
-    trainer = Trainer(**trainer_kwargs)
+    trainer = Trainer(**trainer_kwargs, callbacks=[CancellationCallback()])
     on_progress(15, {"phase": "training", "message": "Training instruction adapter weights"})
     result = trainer.train()
+    if should_stop():
+        raise TrainingCancelled("Training cancelled by user")
     on_progress(90, {"phase": "saving", "message": "Saving adapter and tokenizer"})
+    if should_stop():
+        raise TrainingCancelled("Training cancelled before saving artifacts")
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
     metrics = dict(result.metrics)
@@ -76,6 +93,12 @@ def train_with_lora(*, model_id: str, rows: list[dict[str, str]], config: dict, 
             if isinstance(value, (int, float)):
                 metrics[key if key.startswith("eval_") else f"eval_{key}"] = value
     metrics["duration_seconds"] = round(time.perf_counter() - start, 2)
+    metrics["history"] = [
+        {key: (float(value) if isinstance(value, Real) else value) for key, value in record.items() if key in {"step", "loss", "eval_loss", "learning_rate", "epoch"}}
+        for record in trainer.state.log_history
+        if any(key in record for key in ("loss", "eval_loss"))
+    ]
+    metrics["checkpoints"] = sorted(path.name for path in output_dir.glob("checkpoint-*"))
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     on_progress(100, {"phase": "completed", "message": "Training completed"})
-    return {"train_loss": metrics.get("train_loss"), "eval_loss": metrics.get("eval_loss"), "duration_seconds": metrics["duration_seconds"], "artifact_dir": str(output_dir)}
+    return {"train_loss": metrics.get("train_loss"), "eval_loss": metrics.get("eval_loss"), "duration_seconds": metrics["duration_seconds"], "artifact_dir": str(output_dir), "history": metrics["history"], "checkpoints": metrics["checkpoints"]}

@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.services.storage import DATA_DIR, store
-from app.utils.dataset import DatasetValidationError, load_and_validate
+from app.utils.dataset import DatasetValidationError, load_and_validate, quality_report
 
 router = APIRouter(tags=["datasets"])
 
@@ -40,7 +40,7 @@ def upload_dataset(file: UploadFile = File(...)) -> dict:
     except DatasetValidationError as exc:
         saved_path.unlink(missing_ok=True)
         raise HTTPException(422, str(exc)) from exc
-    dataset = {"id": dataset_id, "name": name, "format": fmt, "records": len(rows), "status": "Ready", "created_at": datetime.now(timezone.utc).isoformat(), "samples": rows[:5], "path": str(saved_path)}
+    dataset = {"id": dataset_id, "name": name, "format": fmt, "records": len(rows), "status": "Ready", "created_at": datetime.now(timezone.utc).isoformat(), "samples": rows[:5], "quality": quality_report(rows), "path": str(saved_path)}
     return store.add_dataset(dataset)
 
 

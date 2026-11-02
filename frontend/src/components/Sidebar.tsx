@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Database, FlaskConical, LayoutDashboard, Menu, Settings2, Sparkles, X } from 'lucide-react'
+import { BookOpen, Bot, Database, FlaskConical, LayoutDashboard, Menu, MonitorCog, Settings2, Sparkles, X } from 'lucide-react'
 import type { View } from '../types'
 
 const nav: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
@@ -7,6 +7,7 @@ const nav: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'training', label: 'Fine-tune', icon: FlaskConical },
   { id: 'playground', label: 'Playground', icon: Bot },
   { id: 'history', label: 'Experiment history', icon: BookOpen },
+  { id: 'models', label: 'Model manager', icon: MonitorCog },
 ]
 
 export function Sidebar({ view, setView, open, setOpen }: { view: View; setView: (view: View) => void; open: boolean; setOpen: (open: boolean) => void }) {

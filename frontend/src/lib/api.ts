@@ -20,9 +20,12 @@ export const api = {
   uploadDataset: (file: File) => { const form = new FormData(); form.append('file', file); return request<Dataset>('/datasets/upload', { method: 'POST', body: form }) },
   deleteDataset: (id: string) => request<{ ok: boolean }>(`/datasets/${id}`, { method: 'DELETE' }),
   models: () => request<ModelOption[]>('/models'),
+  importModel: (modelId: string, sourcePath: string) => request<ModelOption>('/models/import', { method: 'POST', body: JSON.stringify({ model_id: modelId, source_path: sourcePath }) }),
   experiments: () => request<Experiment[]>('/experiments'),
   createExperiment: (payload: unknown) => request<Experiment>('/experiments', { method: 'POST', body: JSON.stringify(payload) }),
   startTraining: (id: string) => request<Experiment>(`/experiments/${id}/train`, { method: 'POST' }),
+  cancelTraining: (id: string) => request<Experiment>(`/experiments/${id}/cancel`, { method: 'POST' }),
+  retryTraining: (id: string) => request<Experiment>(`/experiments/${id}/retry`, { method: 'POST' }),
   generate: (payload: unknown) => request<{ response: string; model: string; generated_tokens: number }>('/playground/generate', { method: 'POST', body: JSON.stringify(payload) }),
 }
 

@@ -95,6 +95,17 @@ class StudioStore:
             self._save()
             return experiment
 
+    def append_experiment_log(self, experiment_id: str, entry: dict[str, Any]) -> dict | None:
+        with self._lock:
+            experiment = self._db["experiments"].get(experiment_id)
+            if not experiment:
+                return None
+            logs = experiment.setdefault("logs", [])
+            logs.append(entry)
+            experiment["logs"] = logs[-100:]
+            self._save()
+            return experiment
+
     def dashboard(self) -> dict:
         experiments = self.list_experiments()
         return {"experiments": len(experiments), "datasets": len(self._db["datasets"]), "completed": sum(e["status"] == "completed" for e in experiments), "running": sum(e["status"] in {"running", "queued"} for e in experiments), "total_records": sum(d["records"] for d in self._db["datasets"].values()), "recent": experiments[:5]}

@@ -19,6 +19,10 @@ The project combines a React dashboard with a FastAPI service. It is designed fo
 - CPU support, with CUDA used automatically when available
 - Base-model and fine-tuned-model playground
 - Local experiment history, metrics, datasets, and adapter checkpoints
+- Real loss history and evaluation details from completed runs
+- Dataset quality scores for duplicates, short examples, and length outliers
+- Cancellable, retryable training with live progress logs and reproducible seeds
+- Local model manager showing checkpoint availability
 - Offline-friendly local model loading when checkpoint files are present
 
 ## Stack
@@ -159,10 +163,13 @@ Runtime data is intentionally local and ignored by Git:
 | --- | --- | --- |
 | `GET` | `/api/health` | Check API status and runtime device |
 | `GET` | `/api/models` | List catalogued models and local availability |
+| `POST` | `/api/models/import` | Import a downloaded local checkpoint folder |
 | `GET` | `/api/dashboard` | Return dashboard counts and recent experiments |
 | `GET/POST/DELETE` | `/api/datasets` | List, upload, and delete datasets |
 | `GET/POST` | `/api/experiments` | List and create experiments |
 | `POST` | `/api/experiments/{id}/train` | Start a background training run |
+| `POST` | `/api/experiments/{id}/cancel` | Request cooperative training cancellation |
+| `POST` | `/api/experiments/{id}/retry` | Retry a failed or cancelled run |
 | `POST` | `/api/playground/generate` | Generate text from a base or fine-tuned model |
 
 The complete request and response schemas are available at `/docs` while the backend is running.
@@ -202,16 +209,21 @@ The playground only enables the adapter after its experiment reaches `completed`
 
 ## What to improve next
 
-Recommended order for turning this into a stronger project:
+Implemented in this version:
+
+1. **Real evaluation dashboard.** Completed runs save step-level loss history and expose train/eval metrics.
+2. **Experiment detail pages.** History includes configuration, artifacts, logs, status, and retry/cancel actions.
+3. **Dataset quality tools.** Uploads receive duplicate, length, average-size, and quality-score analysis.
+4. **Safer training controls.** Runs support cancellation, retry, duplicate-run protection, live logs, checkpoints, and a seed.
+5. **Model manager.** The dashboard shows local checkpoint availability and the exact folder convention for importing models.
+
+Recommended next improvements:
 
 1. **Add automated tests.** Cover dataset validation, API routes, experiment state transitions, and a mocked training run.
-2. **Improve experiment evaluation.** Store a held-out validation set, show real loss curves from `metrics.json`, and add a small side-by-side evaluation table.
-3. **Make training safer.** Add cancellation, prevent duplicate runs, validate available disk/RAM, and persist logs separately from metadata.
-4. **Add model management.** Provide a clear download/import flow and hide models that are not locally available.
-5. **Improve reproducibility.** Save the dataset hash, library versions, device, random seed, model revision, and full training configuration with every run.
-6. **Polish the UI.** Add experiment detail pages, artifact download buttons, error details, empty/loading states, and a real progress timeline.
-7. **Prepare deployment.** Add Docker support, environment-based CORS configuration, a real database, a worker queue, authentication, and object storage.
-8. **Add project quality gates.** Use Ruff/Black/Pytest for Python, ESLint/Prettier/Vitest for TypeScript, and GitHub Actions for build and test checks.
+2. **Improve evaluation.** Add a held-out benchmark set and side-by-side scored outputs, not only loss curves.
+3. **Improve reproducibility.** Save dataset hashes, library versions, device information, and model revisions with every run.
+4. **Prepare deployment.** Add Docker, environment-based CORS, a real database, a worker queue, authentication, and object storage.
+5. **Add project quality gates.** Use Ruff/Black/Pytest for Python, ESLint/Prettier/Vitest for TypeScript, and GitHub Actions.
 
 ## Current limitations
 
